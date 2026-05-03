@@ -116,3 +116,21 @@ def test_token_never_appears_in_error_output(mock_server):
     assert rc == 1
     assert "secret-must-not-leak" not in err
     assert "secret-must-not-leak" not in out
+
+
+def test_huge_error_body_is_truncated(mock_server):
+    """A multi-MB error body must not flood stderr — should truncate around 4 KB."""
+    base_url, server = mock_server
+    huge_body = ("X" * 50_000)
+    server.response_queue.append((500, huge_body.encode("utf-8"), {}))
+
+    rc, out, err = run_script(
+        ["--method", "GET", "--url", f"{base_url}/api/v4/account"],
+        env_overrides={"AMOCRM_SUBDOMAIN": "demo", "AMOCRM_TOKEN": "tok"},
+    )
+
+    assert rc == 1
+    # stderr is at most a few KB after truncation, never 50_000+
+    assert len(err) < 10_000
+    assert "truncated" in err
+    assert "50000" in err  # original size mentioned

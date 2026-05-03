@@ -22,8 +22,13 @@ def build_url(url_arg: str, subdomain: str) -> str:
     return f"https://{subdomain}.amocrm.ru{url_arg}"
 
 
-def _classify_error(status: int, body: str, headers: dict) -> str:
-    """Build a one-paragraph, actionable stderr message for an HTTP error."""
+MAX_ERROR_BODY = 4096
+
+
+def _classify_error(status: int, body: str, headers) -> str:
+    """Build a 1-2 line stderr message for an HTTP error, with a recovery hint and the server body."""
+    if len(body) > MAX_ERROR_BODY:
+        body = body[:MAX_ERROR_BODY] + f"... [truncated, {len(body)} bytes total]"
     if status == 401:
         return (
             "error: HTTP 401 — AMOCRM_TOKEN is invalid or expired. "
@@ -40,7 +45,7 @@ def _classify_error(status: int, body: str, headers: dict) -> str:
     if status == 404:
         return f"error: HTTP 404 — resource not found.\nserver response: {body}"
     if status == 429:
-        retry_after = headers.get("Retry-After") or headers.get("retry-after") or "?"
+        retry_after = headers.get("Retry-After") or "?"
         return (
             f"error: HTTP 429 — rate limit hit. Wait {retry_after} seconds before "
             "retrying. amoCRM allows ~7 RPS per integration.\n"
@@ -124,7 +129,7 @@ def main() -> int:
             return 0
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
-        msg = _classify_error(e.code, body, dict(e.headers))
+        msg = _classify_error(e.code, body, e.headers)
         print(msg, file=sys.stderr)
         return 1
     except urllib.error.URLError as e:
