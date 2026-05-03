@@ -98,7 +98,7 @@ def main() -> int:
         query = urllib.parse.urlencode(params, doseq=True)
     full_url = url + ("?" + query if query else "")
 
-    headers = {"Authorization": f"Bearer {token}"}
+    headers: dict = {}
     body_bytes = None
     if args.body is not None:
         # Body is JSON text — send it through as-is, but verify it parses
