@@ -1,0 +1,8 @@
+{
+  "name": "amo-crm-api",
+  "version": "0.1.0",
+  "description": "amoCRM REST API v4 skill — manage leads, contacts, companies, tasks, notes",
+  "author": "MissiaL",
+  "license": "MIT",
+  "keywords": ["amocrm", "crm", "sales", "leads", "contacts", "tasks"]
+}
