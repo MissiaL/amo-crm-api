@@ -1,81 +1,88 @@
 # amo-crm-api
 
-Agent-skill for [amoCRM](https://www.amocrm.ru/) REST API v4. Gives any LLM
-agent (Claude Code, Claude.ai, custom Telegram bot, etc.) full CRUD over
-leads, contacts, companies, tasks, and notes — plus dictionary lookups and
-webhook subscription management.
+Агентский навык для [amoCRM](https://www.amocrm.ru/) REST API v4. Даёт любому
+LLM-агенту (Claude Code, Claude.ai, своему Telegram-боту и т. п.) полный CRUD
+над сделками, контактами, компаниями, задачами и заметками — плюс справочники
+и управление подписками на webhook-события.
 
-The skill consists of:
-- `SKILL.md` — agent-facing entry point with workflows and rules
-- `references/*.md` — detailed per-area documentation, loaded by the agent on demand
-- `scripts/api_call.py` — thin Python HTTP client that signs every request with Bearer auth
+В составе навыка:
+- `SKILL.md` — точка входа для агента: workflow и правила
+- `references/*.md` — подробная документация по разделам API, агент подгружает по мере надобности
+- `scripts/api_call.py` — тонкий HTTP-клиент на стандартной библиотеке Python, подписывает каждый запрос Bearer-токеном
 
-## Install
+## Установка
 
 ```bash
 git clone https://github.com/MissiaL/amo-crm-api ~/.claude/skills/amo-crm-api
 ```
 
-Or, when published, via clawhub:
+Или, после публикации, через clawhub:
 
 ```bash
 clawhub install missial/amo-crm-api
 ```
 
-## Get an amoCRM long-lived token
+## Как получить долгоживущий токен amoCRM
 
-1. Log in to your amoCRM account.
-2. Open **Settings → Integrations** ([direct link](https://www.amocrm.ru/settings/widgets/)).
-3. Click **+Create integration → "Внешняя интеграция"** (External integration), or
-   pick an existing internal integration.
-4. In the integration settings, enable the **"Долгосрочный период"** (Long-lived
-   period) toggle and copy the generated access token. It's valid for years and
-   doesn't need refresh.
-5. Note your account subdomain — the part before `.amocrm.ru` in your URL
-   (e.g. `mycompany` for `https://mycompany.amocrm.ru`).
+Нужны права администратора аккаунта.
 
-## Configure environment
+1. Откройте amoCRM → нажмите на ваше имя в правом верхнем углу → **Настройки**.
+2. Перейдите в раздел **Интеграции** → **+ Создать интеграцию** → выберите
+   **Внешнюю интеграцию**.
+3. Заполните название (например, *«Агентский помощник»*), ссылку для
+   перенаправления можно оставить заглушкой (`https://example.com`),
+   разрешите доступ к нужным разделам (минимум: сделки, контакты, компании,
+   задачи, каталоги).
+4. Сохраните интеграцию.
+5. Откройте созданную интеграцию заново → вкладка **«Ключи и доступы»**.
+6. В блоке **«Долгосрочный токен»** нажмите **«Сгенерировать»** и скопируйте
+   полученное значение целиком (длинная строка вида `eyJ0eXAi...`). Токен
+   действует годами, обновлять не нужно.
+7. Запомните **поддомен** аккаунта — часть в URL до `.amocrm.ru`. Например,
+   для `https://mycompany.amocrm.ru` поддомен — `mycompany`.
 
-Set two env vars:
+## Настройка окружения
+
+Установите две переменные окружения:
 
 ```bash
 export AMOCRM_SUBDOMAIN=mycompany
 export AMOCRM_TOKEN=eyJ0eXAi...
 ```
 
-Or copy [.env.example](.env.example) to `.env` and fill in.
+Или скопируйте [.env.example](.env.example) в `.env` и заполните.
 
-Sanity-check:
+Проверочный запрос:
 
 ```bash
 python scripts/api_call.py --method GET --url "/api/v4/account"
 ```
 
-A 200 with the account JSON means the skill is wired up. A 401 means the token
-is wrong or expired.
+Ответ 200 с JSON-описанием аккаунта означает, что навык подключён правильно.
+401 — токен неверный или истёк.
 
-## Use with an agent
+## Использование с агентом
 
-Once the skill directory is in a path the agent searches (e.g.
-`~/.claude/skills/`), tell the agent something like:
+Когда папка навыка лежит в каталоге, который агент сканирует (например,
+`~/.claude/skills/`), агенту можно дать обычную человеческую задачу:
 
-> "Find all open deals in the main pipeline assigned to Ivan and create a task
-> to call them tomorrow."
+> «Найди все открытые сделки в основной воронке, ответственный — Иван, и
+> поставь по ним задачу позвонить завтра».
 
-The agent reads `SKILL.md`, decides which `references/*.md` to load, and uses
-`scripts/api_call.py` to make the calls.
+Агент сам прочитает `SKILL.md`, решит, какие `references/*.md` подгрузить,
+и сделает нужные вызовы через `scripts/api_call.py`.
 
 ## Webhooks
 
-The skill can **manage subscriptions** to amoCRM webhook events through
-REST — register a destination URL, list current subscriptions, unsubscribe.
-It does NOT receive webhook events; for that you need a separate public HTTPS
-server. See [references/webhooks.md](references/webhooks.md).
+Навык умеет **управлять подписками** на webhook-события amoCRM через REST —
+зарегистрировать URL, посмотреть активные подписки, отписаться. **Принимать**
+события навык не умеет: для этого нужен отдельный публичный HTTPS-сервис.
+Подробности — в [references/webhooks.md](references/webhooks.md).
 
-## License
+## Лицензия
 
 [MIT](LICENSE)
 
-## Author
+## Автор
 
 [MissiaL](https://github.com/MissiaL)
