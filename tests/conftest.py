@@ -23,7 +23,7 @@ class RecordingHandler(BaseHTTPRequestHandler):
             "path": parsed.path,
             "query": parsed.query,
             "query_parsed": parse_qs(parsed.query, keep_blank_values=True),
-            "headers": dict(self.headers),
+            "headers": self.headers,  # http.client.HTTPMessage — case-insensitive lookup
             "body": body.decode("utf-8") if body else "",
         })
         if self.server.response_queue:

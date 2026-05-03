@@ -22,6 +22,41 @@ def build_url(url_arg: str, subdomain: str) -> str:
     return f"https://{subdomain}.amocrm.ru{url_arg}"
 
 
+def _classify_error(status: int, body: str, headers: dict) -> str:
+    """Build a one-paragraph, actionable stderr message for an HTTP error."""
+    if status == 401:
+        return (
+            "error: HTTP 401 — AMOCRM_TOKEN is invalid or expired. "
+            "Generate a new long-lived token in amoCRM Settings → Integrations "
+            "and update AMOCRM_TOKEN.\n"
+            f"server response: {body}"
+        )
+    if status == 403:
+        return (
+            "error: HTTP 403 — token has no permission for this endpoint. "
+            "Check the integration's scopes in amoCRM.\n"
+            f"server response: {body}"
+        )
+    if status == 404:
+        return f"error: HTTP 404 — resource not found.\nserver response: {body}"
+    if status == 429:
+        retry_after = headers.get("Retry-After") or headers.get("retry-after") or "?"
+        return (
+            f"error: HTTP 429 — rate limit hit. Wait {retry_after} seconds before "
+            "retrying. amoCRM allows ~7 RPS per integration.\n"
+            f"server response: {body}"
+        )
+    if 500 <= status < 600:
+        return (
+            f"error: HTTP {status} — server-side failure on amoCRM. Retry later.\n"
+            f"server response: {body}"
+        )
+    if status == 400:
+        # Validation errors — surface the body verbatim, it has details
+        return f"error: HTTP 400 — validation failed.\nserver response: {body}"
+    return f"error: HTTP {status}\nserver response: {body}"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="amoCRM HTTP client")
     parser.add_argument("--method", required=True, choices=["GET", "POST", "PATCH", "DELETE"])
@@ -76,21 +111,21 @@ def main() -> int:
             print(f"error: --headers is not valid JSON: {e}", file=sys.stderr)
             return 1
         headers.update(extra)
+    # Authorization is non-overridable — always Bearer-from-env
+    headers["Authorization"] = f"Bearer {token}"
 
     req = urllib.request.Request(full_url, data=body_bytes, headers=headers, method=args.method)
     try:
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             data = resp.read()
             if data:
                 sys.stdout.write(data.decode("utf-8"))
                 sys.stdout.write("\n")
             return 0
     except urllib.error.HTTPError as e:
-        # Error classification — implemented in Task 4
         body = e.read().decode("utf-8", errors="replace")
-        print(f"error: HTTP {e.code}", file=sys.stderr)
-        if body:
-            print(body, file=sys.stderr)
+        msg = _classify_error(e.code, body, dict(e.headers))
+        print(msg, file=sys.stderr)
         return 1
     except urllib.error.URLError as e:
         print(f"error: network failure: {e.reason}", file=sys.stderr)

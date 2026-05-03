@@ -98,3 +98,20 @@ def test_204_no_content_returns_empty_string(mock_server):
 
     assert rc == 0, err
     assert out.strip() == ""
+
+
+def test_extra_headers_cannot_override_authorization(mock_server):
+    base_url, server = mock_server
+    server.response_queue.append((200, {"ok": True}, {}))
+
+    rc, out, err = run_script(
+        [
+            "--method", "GET",
+            "--url", f"{base_url}/api/v4/account",
+            "--headers", json.dumps({"Authorization": "Bearer evil"}),
+        ],
+        env_overrides={"AMOCRM_SUBDOMAIN": "demo", "AMOCRM_TOKEN": "real"},
+    )
+
+    assert rc == 0, err
+    assert server.requests[0]["headers"]["Authorization"] == "Bearer real"
