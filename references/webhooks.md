@@ -40,7 +40,7 @@ Response shape:
         "created_by": 42,
         "sort": 1,
         "disabled": false,
-        "settings": ["leads:add", "leads:status"]
+        "settings": ["add_lead", "status_lead"]
       }
     ]
   }
@@ -52,7 +52,7 @@ Response shape:
 ```bash
 python scripts/api_call.py --method POST --url "/api/v4/webhooks" --body '{
   "destination": "https://my-bot.example.com/amo-hook",
-  "settings": ["leads:add", "leads:status", "contacts:add"]
+  "settings": ["add_lead", "status_lead", "add_contact"]
 }'
 ```
 
@@ -63,47 +63,54 @@ Constraints:
 
 ## Available events (`settings[]`)
 
+Event names follow the `<action>_<entity>` convention.
+
 ### Leads
-- `leads:add`
-- `leads:update`
-- `leads:delete`
-- `leads:restore`
-- `leads:status`
-- `leads:responsible`
+- `add_lead`
+- `update_lead`
+- `delete_lead`
+- `restore_lead`
+- `status_lead` — status or pipeline changed
+- `responsible_lead`
 
 ### Contacts
-- `contacts:add`
-- `contacts:update`
-- `contacts:delete`
-- `contacts:responsible`
+- `add_contact`
+- `update_contact`
+- `delete_contact`
+- `restore_contact`
+- `responsible_contact`
 
 ### Companies
-- `companies:add`
-- `companies:update`
-- `companies:delete`
-- `companies:responsible`
+- `add_company`
+- `update_company`
+- `delete_company`
+- `restore_company`
+- `responsible_company`
 
 ### Customers (only if customers are enabled in the account)
-- `customers:add`
-- `customers:update`
-- `customers:delete`
-- `customers:status`
-- `customers:responsible`
-
-### Notes (created on entity)
-- `note:lead:add`
-- `note:contact:add`
-- `note:company:add`
-- `note:customer:add`
+- `add_customer`
+- `update_customer`
+- `delete_customer`
+- `restore_customer`
+- `status_customer`
+- `responsible_customer`
 
 ### Tasks
-- `task:add`
-- `task:update`
-- `task:delete`
+- `add_task`
+- `update_task`
+- `delete_task`
 
-### Other
-- `incoming_chat_message`
-- `incoming_call`
+### Notes (created on entity)
+- `note_lead`
+- `note_contact`
+- `note_company`
+- `note_customer`
+
+### Inbound activity
+- `add_unsorted` — new lead landed in the "Неразобранное" inbox
+- `add_message` — inbound chat message
+- `incoming_call` — inbound call (legacy)
+- `incoming_chat_message` — inbound chat message (legacy)
 
 If an event isn't supported on your account plan, the subscription is silently
 ignored for that key but other keys still register.
@@ -132,6 +139,6 @@ python scripts/api_call.py --method DELETE --url "/api/v4/webhooks" \
 # 3. Create with new settings
 python scripts/api_call.py --method POST --url "/api/v4/webhooks" --body '{
   "destination": "https://my-bot.example.com/amo-hook",
-  "settings": ["leads:add", "leads:status", "task:add", "task:update"]
+  "settings": ["add_lead", "status_lead", "add_task", "update_task"]
 }'
 ```

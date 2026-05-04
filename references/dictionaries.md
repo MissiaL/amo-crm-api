@@ -39,7 +39,10 @@ System statuses are present in every pipeline:
 | 142 | Successful (won) |
 | 143 | Closed and unsuccessful (lost) — requires `loss_reason_id` |
 
-`type` field on a status: `0` = normal, `1` = won, `2` = lost.
+Won/lost are determined by the **fixed `status_id` 142 / 143**, not by the
+`type` field. The `type` field marks special inbox states: `1` = "Неразобранное"
+(unsorted inbox), `0` = regular working status (this includes 142/143 in
+practice). Always identify won/lost by `status_id == 142` / `status_id == 143`.
 
 ## Users
 
