@@ -1,7 +1,7 @@
 ---
 name: amo-crm-api
 description: Manage amoCRM via REST API v4 — create, search, update leads, contacts, companies, tasks, and notes. Use when the user asks about CRM, sales, deals, customers, or amoCRM.
-metadata: {"author":"MissiaL","version":"0.1.0","keywords":["amocrm","crm","sales","leads","contacts","tasks"]}
+metadata: {"author":"MissiaL","version":"0.1.1","keywords":["amocrm","crm","sales","leads","contacts","tasks"]}
 ---
 
 # amo-crm-api
