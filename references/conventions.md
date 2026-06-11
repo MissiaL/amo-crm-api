@@ -160,9 +160,15 @@ For DATE fields, pass Unix timestamp.
 
 ## Rate limits
 
-amoCRM allows ~7 requests per second per integration. The 429 response carries
-a `Retry-After` header in seconds. `api_call.py` surfaces it in the error
-message — wait, then retry the same call.
+amoCRM allows **7 requests per second per integration** and up to **50 rps for
+the whole account**. The 429 response carries a `Retry-After` header in
+seconds. `api_call.py` surfaces it in the error message — wait, then retry the
+same call. Repeated violations get the account blocked: every API call then
+returns 403 — so back off honestly instead of hammering.
+
+Bulk create/update requests accept at most **250 entities per request**;
+amoCRM recommends ≤50 for reliability. On a 504, reduce the batch size and
+retry.
 
 ## Idempotency for creation
 

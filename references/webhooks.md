@@ -60,6 +60,9 @@ Constraints:
 - `destination` MUST be HTTPS.
 - The URL must be publicly reachable; amoCRM ping-tests on subscribe.
 - `settings` is a flat array of event keys.
+- Requires account-admin rights; an account holds at most **100 webhooks**.
+- If a webhook with the same `destination` already exists, POST **updates it
+  in place** with the new `settings` — no need to DELETE first.
 
 ## Available events (`settings[]`)
 
@@ -91,14 +94,15 @@ Event names follow the `<action>_<entity>` convention.
 - `add_customer`
 - `update_customer`
 - `delete_customer`
-- `restore_customer`
-- `status_customer`
 - `responsible_customer`
+
+(There is no `restore_customer` or `status_customer` in the official list.)
 
 ### Tasks
 - `add_task`
 - `update_task`
 - `delete_task`
+- `responsible_task`
 
 ### Notes (created on entity)
 - `note_lead`
@@ -106,11 +110,12 @@ Event names follow the `<action>_<entity>` convention.
 - `note_company`
 - `note_customer`
 
-### Inbound activity
-- `add_unsorted` — new lead landed in the "Неразобранное" inbox
-- `add_message` — inbound chat message
-- `incoming_call` — inbound call (legacy)
-- `incoming_chat_message` — inbound chat message (legacy)
+### Talks (беседы)
+- `add_talk`
+- `update_talk`
+
+### Misc
+- `add_chat_template_review` — WhatsApp template sent for approval
 
 If an event isn't supported on your account plan, the subscription is silently
 ignored for that key but other keys still register.
@@ -123,20 +128,14 @@ python scripts/api_call.py --method DELETE --url "/api/v4/webhooks" --body '{
 }'
 ```
 
-The whole destination is removed — there's no per-event unsubscribe. To change
-the event list, DELETE then POST with the new `settings`.
+The whole destination is removed — there's no per-event unsubscribe.
 
-## Common workflow: re-subscribe with a different event set
+## Common workflow: change the event set for a destination
+
+POST with an existing `destination` replaces its `settings`, so a single call
+is enough:
 
 ```bash
-# 1. Read existing subscriptions
-python scripts/api_call.py --method GET --url "/api/v4/webhooks"
-
-# 2. Delete the old subscription for our destination
-python scripts/api_call.py --method DELETE --url "/api/v4/webhooks" \
-  --body '{"destination":"https://my-bot.example.com/amo-hook"}'
-
-# 3. Create with new settings
 python scripts/api_call.py --method POST --url "/api/v4/webhooks" --body '{
   "destination": "https://my-bot.example.com/amo-hook",
   "settings": ["add_lead", "status_lead", "add_task", "update_task"]
