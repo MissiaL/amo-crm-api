@@ -16,7 +16,6 @@ Read [conventions.md](conventions.md) first.
 | `POST` | `/api/v4/tasks` (array) |
 | `PATCH` | `/api/v4/tasks/{id}` (object) |
 | `PATCH` | `/api/v4/tasks` (array, bulk) |
-| `DELETE` | `/api/v4/tasks/{id}` |
 
 ### Task object shape
 
@@ -40,11 +39,11 @@ Read [conventions.md](conventions.md) first.
 
 | `task_type_id` | Meaning |
 |---|---|
-| 1 | Связаться (call/contact) |
+| 1 | Звонок / связаться |
 | 2 | Встреча (meeting) |
-| 3 | Письмо (email) |
 
-Custom types: see [dictionaries.md](dictionaries.md) — `GET /api/v4/account?with=task_types`.
+amoCRM currently documents only IDs 1 and 2 as standard. Discover any
+account-specific types via `GET /api/v4/account?with=task_types`; never assume ID 3.
 
 ### Create a task
 
@@ -79,11 +78,11 @@ python scripts/api_call.py --method GET --url "/api/v4/tasks" --params '{
   "filter[entity_id]": "12345"
 }'
 
-# Tasks due today
+# Candidates due today: API has no complete_till range filter; bound client-side
 python scripts/api_call.py --method GET --url "/api/v4/tasks" --params '{
   "filter[is_completed]": "0",
-  "filter[updated_at][from]": "1714521600",
-  "filter[updated_at][to]": "1714608000"
+  "order[complete_till]": "asc",
+  "limit": "250"
 }'
 ```
 
@@ -112,7 +111,9 @@ others (calls, attachments) carry structured `params`.
 | `GET` | `/api/v4/{entity}/notes` (across all entities of a type) |
 | `POST` | `/api/v4/{entity}/{id}/notes` |
 | `PATCH` | `/api/v4/{entity}/{id}/notes/{note_id}` |
-| `DELETE` | `/api/v4/{entity}/{id}/notes/{note_id}` |
+
+The v4 notes API documents listing, creation, and PATCH editing. It does not
+document a DELETE method for notes; do not invent one.
 
 `{entity}` is one of `leads`, `contacts`, `companies`, `customers`.
 

@@ -41,7 +41,7 @@ with empty stdout.
 
 | Param | Range | Default |
 |---|---|---|
-| `limit` | 1–250 | 250 |
+| `limit` | endpoint-specific; usually 1–250 | not guaranteed |
 | `page`  | 1+    | 1 |
 
 Walk results by reading `_links.next.href` and incrementing `page` until
@@ -54,7 +54,7 @@ Filters use bracket-key syntax. Pass them as a JSON object to `--params`;
 
 | Filter | Example value | Notes |
 |---|---|---|
-| `filter[query]` | `"Иванов"` | Full-text across all searchable fields |
+| `query` | `"Иванов"` | Top-level full-text query; documented as slated for deprecation |
 | `filter[name]` | `"ООО Ромашка"` | Exact match on name |
 | `filter[id][]` | `["123","456"]` | Array of IDs |
 | `filter[updated_at][from]` | `"1714521600"` | Unix timestamp |
@@ -71,7 +71,7 @@ Example — find Cyrillic name within a pipeline:
 
 ```bash
 python scripts/api_call.py --method GET --url "/api/v4/leads" --params '{
-  "filter[query]":"Иванов",
+  "query":"Иванов",
   "filter[statuses][0][pipeline_id]":"123",
   "filter[statuses][0][status_id]":"456",
   "limit":"50"
@@ -94,10 +94,19 @@ in their reference files.
 Pass `with` as a CSV string (NOT an array):
 
 ```json
-{"with":"contacts,companies,catalog_elements"}
+{"with":"contacts,catalog_elements"}
 ```
 
 Available `with` values are entity-specific — see each reference file.
+
+## API filtering availability
+
+The expanded `filter[...]` feature is an optional amoCRM account add-on. Before
+depending on filters such as `filter[name]`, status pairs, ranges, or custom
+field values, request `GET /api/v4/account?with=is_api_filter_enabled` and check
+`is_api_filter_enabled`. If it is false, use IDs, top-level `query`, supported
+entity relationships, and client-side filtering. Do not silently assume an
+advanced filter was applied.
 
 ## custom_fields_values format
 
@@ -145,7 +154,7 @@ For DATE fields, pass Unix timestamp.
 | 401 | Token invalid / expired | Ask user to refresh `AMOCRM_TOKEN` |
 | 403 | Token has no permission | Check integration scopes in amoCRM |
 | 404 | Resource not found | Verify the ID exists |
-| 429 | Rate limit hit | Wait `Retry-After` seconds |
+| 429 | Rate limit hit | Honor `Retry-After` if present; otherwise back off |
 | 5xx | Server-side issue | Retry after a short pause |
 
 400 example body:
@@ -161,9 +170,8 @@ For DATE fields, pass Unix timestamp.
 ## Rate limits
 
 amoCRM allows **7 requests per second per integration** and up to **50 rps for
-the whole account**. The 429 response carries a `Retry-After` header in
-seconds. `api_call.py` surfaces it in the error message — wait, then retry the
-same call. Repeated violations get the account blocked: every API call then
+the whole account**. `api_call.py` surfaces `Retry-After` when the server
+provides it. Repeated violations get the account blocked: every API call then
 returns 403 — so back off honestly instead of hammering.
 
 Bulk create/update requests accept at most **250 entities per request**;
@@ -185,8 +193,9 @@ matching response items to your input order, especially when some fail.
 
 ## A note on POST bodies
 
-Every POST that creates entities expects an array, even for a single object.
-This catches new users every time:
+Bulk entity creation endpoints expect an array, even for a single object.
+This applies to leads, contacts, companies, tasks, and notes, but not to every
+POST in the API (for example, webhook subscription takes an object):
 
 ```bash
 # Wrong — 400 Bad Request

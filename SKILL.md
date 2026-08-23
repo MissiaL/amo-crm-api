@@ -1,7 +1,7 @@
 ---
 name: amo-crm-api
-description: Manage amoCRM via REST API v4 — create, search, update leads, contacts, companies, tasks, and notes. Use when the user asks about CRM, sales, deals, customers, or amoCRM.
-metadata: {"author":"MissiaL","version":"0.1.2","keywords":["amocrm","crm","sales","leads","contacts","tasks"]}
+description: "Work with amoCRM (amo CRM, амоСРМ) REST API v4: сделки, контакты, компании, задачи, примечания, справочники и webhook-подписки. Use for amoCRM API requests and account data operations on *.amocrm.ru; not for generic CRM advice."
+metadata: {"author":"MissiaL","version":"0.2.0","keywords":["amocrm","crm","sales","leads","contacts","tasks"]}
 ---
 
 # amo-crm-api
@@ -17,7 +17,7 @@ Two environment variables are required:
 | Var | Example | Where to get it |
 |---|---|---|
 | `AMOCRM_SUBDOMAIN` | `mycompany` | The part before `.amocrm.ru` in your account URL |
-| `AMOCRM_TOKEN` | `eyJ0eXAi...` | Long-lived token from Settings → Integrations → Create internal integration → Long-lived token |
+| `AMOCRM_TOKEN` | `eyJ0eXAi...` | Long-lived token from amoMarket → Integrations → integration keys |
 
 Sanity-check the setup:
 
@@ -25,8 +25,9 @@ Sanity-check the setup:
 python scripts/api_call.py --method GET --url "/api/v4/account"
 ```
 
-A 200 with the account JSON means you're set. A 401 means the token is invalid
-or expired.
+A 200 with the account JSON means you're set. A 401 means the token is invalid,
+expired, revoked, or the integration was disabled. Long-lived tokens have a
+user-selected expiry of 1 day to 5 years and no refresh token.
 
 ## HTTP client
 
@@ -80,8 +81,8 @@ Load only what you need for the current request:
 ### 2. Find a customer's deals by name or phone
 
 ```
-1. GET /api/v4/contacts?filter[query]=Иванов  → find contact_id
-2. GET /api/v4/leads?filter[contact_id][]=...  (or use ?with=contacts on /leads)
+1. GET /api/v4/contacts?query=Иванов&with=leads  → find the contact
+2. Read its `_embedded.leads[]` IDs, then GET those leads by ID as needed
 ```
 
 ### 3. Move a deal to a different status
@@ -104,20 +105,25 @@ Load only what you need for the current request:
   The script handles auth, encoding, and error classification for you.
 - **Read `references/dictionaries.md` BEFORE creating or updating** entities
   with custom fields, status, pipeline, or responsible user. You need real IDs.
-- **amoCRM responses always nest items under `_embedded`** —
-  `data["_embedded"]["leads"]`, `data["_embedded"]["contacts"]`, etc. Don't
-  guess a different shape.
-- **POST bodies are arrays.** Even when creating a single lead, contact,
-  company, or task, the body is `[{...}]`. PATCH for a single entity by ID
-  (`PATCH /api/v4/leads/{id}`) takes an object; bulk PATCH (`PATCH /api/v4/leads`) takes an array.
+- **Collection responses with content nest items under `_embedded`** — for
+  example `data["_embedded"]["leads"]`. Single-entity responses are direct
+  objects; some empty results and successful deletes return 204 with no body.
+- **Bulk entity creation uses arrays.** Leads, contacts, companies, tasks, and
+  notes use `[{...}]` even for one item. Webhook subscription uses an object;
+  link endpoints use an array. Single-by-ID PATCH uses an object; bulk PATCH
+  uses an array.
 - **Phone and email are NOT first-class fields** on contacts/companies — they
   live inside `custom_fields_values` with `field_code: "PHONE"` and
   `field_code: "EMAIL"`. See `references/contacts-companies.md`.
 - **On 401, ask the user to refresh `AMOCRM_TOKEN`.** Don't pretend the bot
   can fix it. The token has likely expired or was revoked.
-- **On 429, wait the number of seconds in the error message** before retrying.
-  amoCRM allows ~7 requests per second per integration.
-- **Pagination: `limit` max is 250, default 250.** Use `page=2,3,...` to walk
+- **On 429, honor `Retry-After` when present; otherwise back off before one
+  retry.** The standard limit is 7 requests/s per integration and 50/s per account.
+- **Pagination: `limit` is endpoint-specific and usually max 250.** Use `page=2,3,...` to walk
   results. The response includes `_links.next.href` when more pages exist.
+- **Advanced `filter[...]` fields require the account's API filtering add-on.**
+  Check `GET /api/v4/account?with=is_api_filter_enabled` before
+  relying on alpha filters. Top-level `query` is still documented but marked
+  for future deprecation; prefer stable IDs whenever possible.
 - **Never expose `AMOCRM_TOKEN`** to the user, in logs, or in messages. The
   script already redacts it from output.

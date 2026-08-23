@@ -47,11 +47,12 @@ custom_fields_values format.
 ## Listing with filters and `with`
 
 `with` values: `contacts`, `catalog_elements`, `is_price_modified_by_robot`,
-`loss_reason`, `only_deleted`.
+`loss_reason`, `only_deleted`, `source_id`, `source`. `companies` is not a
+documented `with` value.
 
 ```bash
 python scripts/api_call.py --method GET --url "/api/v4/leads" --params '{
-  "with":"contacts,companies",
+  "with":"contacts",
   "filter[statuses][0][pipeline_id]":"123",
   "filter[statuses][0][status_id]":"456",
   "filter[updated_at][from]":"1714521600",
@@ -64,7 +65,7 @@ python scripts/api_call.py --method GET --url "/api/v4/leads" --params '{
 
 ```bash
 python scripts/api_call.py --method GET --url "/api/v4/leads/12345" \
-  --params '{"with":"contacts,companies,catalog_elements,loss_reason"}'
+  --params '{"with":"contacts,catalog_elements,loss_reason,source"}'
 ```
 
 ## Create a single lead
@@ -114,8 +115,10 @@ python scripts/api_call.py --method POST --url "/api/v4/leads/complex" --body '[
 ]'
 ```
 
-The response body is an array of objects with `id` (lead), `contact_id`,
-`company_id`, and `request_id` (echo of what you sent).
+The endpoint accepts at most 50 leads per request, at most one embedded contact
+and one embedded company per lead, and at most 40 custom-field values per
+created entity. The response is an array of objects with `id` (lead),
+`contact_id`, `company_id`, and `request_id` (echo of what you sent).
 
 ## Update a single lead
 

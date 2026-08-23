@@ -8,14 +8,32 @@ Bearer auth. Designed to be called by an agent — JSON in, JSON out, exit code
 import argparse
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 
 
-def build_url(url_arg: str, subdomain: str) -> str:
+SUBDOMAIN_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
+
+
+def build_url(url_arg: str, subdomain: str, allow_test_url: bool = False) -> str:
+    if not SUBDOMAIN_RE.fullmatch(subdomain):
+        raise ValueError("AMOCRM_SUBDOMAIN must be a bare account subdomain")
     if url_arg.startswith(("http://", "https://")):
+        parsed = urllib.parse.urlsplit(url_arg)
+        expected_host = f"{subdomain}.amocrm.ru"
+        if not allow_test_url and (
+            parsed.scheme != "https"
+            or parsed.hostname != expected_host
+            or parsed.port not in (None, 443)
+            or parsed.username is not None
+            or parsed.password is not None
+        ):
+            raise ValueError(
+                f"absolute URL must use https://{expected_host}; pass a relative /api/v4/... path"
+            )
         return url_arg
     if not url_arg.startswith("/"):
         url_arg = "/" + url_arg
@@ -25,8 +43,11 @@ def build_url(url_arg: str, subdomain: str) -> str:
 MAX_ERROR_BODY = 4096
 
 
-def _classify_error(status: int, body: str, headers) -> str:
+def _classify_error(status: int, body: str, headers, secrets=()) -> str:
     """Build a 1-2 line stderr message for an HTTP error, with a recovery hint and the server body."""
+    for secret in secrets:
+        if secret:
+            body = body.replace(secret, "[REDACTED]")
     if len(body) > MAX_ERROR_BODY:
         body = body[:MAX_ERROR_BODY] + f"... [truncated, {len(body)} bytes total]"
     if status == 401:
@@ -65,7 +86,7 @@ def _classify_error(status: int, body: str, headers) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description="amoCRM HTTP client")
     parser.add_argument("--method", required=True, choices=["GET", "POST", "PATCH", "DELETE"])
-    parser.add_argument("--url", required=True, help="Path like /api/v4/leads, or full https URL")
+    parser.add_argument("--url", required=True, help="Path like /api/v4/leads")
     parser.add_argument("--params", default=None, help="JSON object for query params")
     parser.add_argument("--body", default=None, help="JSON for request body")
     parser.add_argument("--headers", default=None, help="JSON object for extra headers")
@@ -81,7 +102,15 @@ def main() -> int:
         print("error: AMOCRM_TOKEN env var is not set", file=sys.stderr)
         return 1
 
-    url = build_url(args.url, subdomain)
+    try:
+        url = build_url(
+            args.url,
+            subdomain,
+            allow_test_url=os.environ.get("AMOCRM_ALLOW_TEST_URL") == "1",
+        )
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
 
     if args.dry_run:
         print(url)
@@ -94,6 +123,9 @@ def main() -> int:
             params = json.loads(args.params)
         except json.JSONDecodeError as e:
             print(f"error: --params is not valid JSON: {e}", file=sys.stderr)
+            return 1
+        if not isinstance(params, dict):
+            print("error: --params must be a JSON object", file=sys.stderr)
             return 1
         query = urllib.parse.urlencode(params, doseq=True)
     full_url = url + ("?" + query if query else "")
@@ -115,7 +147,10 @@ def main() -> int:
         except json.JSONDecodeError as e:
             print(f"error: --headers is not valid JSON: {e}", file=sys.stderr)
             return 1
-        headers.update(extra)
+        if not isinstance(extra, dict):
+            print("error: --headers must be a JSON object", file=sys.stderr)
+            return 1
+        headers.update({k: v for k, v in extra.items() if k.lower() != "authorization"})
     # Authorization is non-overridable — always Bearer-from-env
     headers["Authorization"] = f"Bearer {token}"
 
@@ -129,7 +164,7 @@ def main() -> int:
             return 0
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
-        msg = _classify_error(e.code, body, e.headers)
+        msg = _classify_error(e.code, body, e.headers, secrets=(token,))
         print(msg, file=sys.stderr)
         return 1
     except urllib.error.URLError as e:

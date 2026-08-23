@@ -155,5 +155,6 @@ Same pattern for contacts and companies (`/contacts/tags`, `/companies/tags`).
 python scripts/api_call.py --method GET --url "/api/v4/account?with=task_types"
 ```
 
-Returns the account object with `_embedded.task_types[]`. Built-in IDs 1, 2, 3
-(Связаться/Встреча/Письмо) are always present; 4+ are custom per account.
+Returns the account object with `_embedded.task_types[]`. The documented
+standard IDs are 1 (Звонок/Связаться) and 2 (Встреча). Treat every other ID as
+account-specific and discover it instead of assuming it exists.

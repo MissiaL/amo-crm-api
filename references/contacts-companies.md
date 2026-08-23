@@ -40,24 +40,21 @@ python scripts/api_call.py --method POST --url "/api/v4/contacts" --body '[
 ]'
 ```
 
-Find a contact by phone:
-
-```bash
-python scripts/api_call.py --method GET --url "/api/v4/contacts" --params '{
-  "filter[custom_fields_values][0][field_code]": "PHONE",
-  "filter[custom_fields_values][0][values][0][value]": "+79991234567"
-}'
-```
-
-Or by exact full-text:
+Find a contact by phone or email using the documented top-level full-text query:
 
 ```bash
 python scripts/api_call.py --method GET --url "/api/v4/contacts" \
-  --params '{"filter[query]": "+79991234567"}'
+  --params '{"query": "+79991234567", "with": "leads"}'
 ```
 
-`filter[query]` searches across phone, email, name, and any indexable custom
-fields — easier but less precise.
+`query` searches filled entity fields, but the official docs mark it for future
+deprecation. Normalize and compare the returned PHONE/EMAIL values before
+deciding that a contact is a duplicate.
+
+If API filtering is enabled, an exact custom-field filter uses the numeric
+field ID as the key, for example
+`filter[custom_fields_values][12345][]=+79991234567`. Do not use the indexed
+`field_code`/`values` shape from write payloads as query parameters.
 
 ## Contact object shape
 
@@ -100,12 +97,12 @@ fields — easier but less precise.
 
 ## Listing with `with=`
 
-Available `with` values: `leads`, `customers`, `catalog_elements`. (Companies
-also expose `contacts` via `with`.)
+Contacts support `leads`, `customers`, and `catalog_elements`. Companies also
+support `contacts`. `companies` is not a documented `with` value for contacts.
 
 ```bash
 python scripts/api_call.py --method GET --url "/api/v4/contacts" \
-  --params '{"with":"leads,companies","limit":"100","order[updated_at]":"desc"}'
+  --params '{"with":"leads","limit":"100","order[updated_at]":"desc"}'
 ```
 
 ## Updating
@@ -143,18 +140,14 @@ amoCRM has a built-in dedupe check, but it's UI-side. Programmatically, search
 by phone or email before creating:
 
 ```bash
-# Try by exact phone first
-python scripts/api_call.py --method GET --url "/api/v4/contacts" --params '{
-  "filter[custom_fields_values][0][field_code]": "PHONE",
-  "filter[custom_fields_values][0][values][0][value]": "+79991234567"
-}'
+# Search by normalized phone first
+python scripts/api_call.py --method GET --url "/api/v4/contacts" \
+  --params '{"query": "+79991234567"}'
 
 # If empty, try by email
-python scripts/api_call.py --method GET --url "/api/v4/contacts" --params '{
-  "filter[custom_fields_values][0][field_code]": "EMAIL",
-  "filter[custom_fields_values][0][values][0][value]": "ivanov@example.com"
-}'
+python scripts/api_call.py --method GET --url "/api/v4/contacts" \
+  --params '{"query": "ivanov@example.com"}'
 ```
 
-If `_embedded.contacts` is non-empty in either response, you have an existing
-contact — link it to the new lead instead of creating a duplicate.
+Inspect returned PHONE/EMAIL values for an exact normalized match. A non-empty
+search response alone is not enough to declare a duplicate.

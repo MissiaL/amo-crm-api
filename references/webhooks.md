@@ -57,9 +57,9 @@ python scripts/api_call.py --method POST --url "/api/v4/webhooks" --body '{
 ```
 
 Constraints:
-- `destination` MUST be HTTPS.
-- The URL must be publicly reachable; amoCRM ping-tests on subscribe.
+- Use a publicly reachable HTTPS `destination`; validate the receiver before subscribing.
 - `settings` is a flat array of event keys.
+- `sort` is optional.
 - Requires account-admin rights; an account holds at most **100 webhooks**.
 - If a webhook with the same `destination` already exists, POST **updates it
   in place** with the new `settings` — no need to DELETE first.
@@ -114,11 +114,15 @@ Event names follow the `<action>_<entity>` convention.
 - `add_talk`
 - `update_talk`
 
+### Messages
+- `add_message` — incoming client message
+- `add_outgoing_message` — outgoing message sent from amoCRM
+
 ### Misc
 - `add_chat_template_review` — WhatsApp template sent for approval
 
-If an event isn't supported on your account plan, the subscription is silently
-ignored for that key but other keys still register.
+Use only keys from the official list and verify the returned `settings`; do not
+assume unknown or unavailable keys were accepted.
 
 ## Unsubscribe
 
