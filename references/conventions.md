@@ -13,7 +13,7 @@ you pass a relative URL like `/api/v4/leads`.
 
 ## Response shape
 
-All list endpoints return:
+Non-empty collection responses usually return:
 
 ```json
 {
@@ -34,8 +34,8 @@ The actual items are always at `data["_embedded"]["<entity>"]`. The presence of
 For single-entity endpoints (`GET /leads/{id}`) you get the entity object
 directly, with related data at `data["_embedded"]` (contacts, tags, etc.).
 
-204 No Content is returned for some DELETE endpoints — `api_call.py` exits 0
-with empty stdout.
+Empty list results and some DELETE endpoints can return 204 No Content —
+`api_call.py` exits 0 with empty stdout. Treat it as an empty result, not JSON.
 
 ## Pagination
 
@@ -62,8 +62,8 @@ Filters use bracket-key syntax. Pass them as a JSON object to `--params`;
 | `filter[created_at][from]` | `"1714521600"` | Unix timestamp |
 | `filter[statuses][N][pipeline_id]` | `"123"` | Pair with `[status_id]` for the same N |
 | `filter[statuses][N][status_id]`   | `"456"` | |
-| `filter[custom_fields_values][N][field_id]` | `"7777"` | Pair with `[values][0][value]` |
-| `filter[custom_fields_values][N][values][0][value]` | `"+79991234567"` | |
+| `filter[custom_fields_values][7777][]` | `["Webform","Referral"]` | Numeric field ID in the key; text values or select enum IDs |
+| `filter[custom_fields_values][8888][from]` | `"1714521600"` | Range for date, date_time, or numeric fields; pair with `[to]` |
 | `filter[responsible_user_id]` | `"42"` | |
 | `filter[pipeline_id]` | `"123"` | Without status — all statuses in pipeline |
 
@@ -152,10 +152,11 @@ For DATE fields, pass Unix timestamp.
 |---|---|---|
 | 400 | Validation error — body has `validation-errors[]` | Fix the request payload |
 | 401 | Token invalid / expired | Ask user to refresh `AMOCRM_TOKEN` |
-| 403 | Token has no permission | Check integration scopes in amoCRM |
+| 402 | Account subscription expired | Check payment status; writes are blocked immediately |
+| 403 | Permission denied or account API blocked | Check user rights, integration access, and repeated rate-limit violations |
 | 404 | Resource not found | Verify the ID exists |
 | 429 | Rate limit hit | Honor `Retry-After` if present; otherwise back off |
-| 5xx | Server-side issue | Retry after a short pause |
+| 5xx | Server-side issue | Back off; reconcile writes before retrying |
 
 400 example body:
 
@@ -175,14 +176,16 @@ provides it. Repeated violations get the account blocked: every API call then
 returns 403 — so back off honestly instead of hammering.
 
 Bulk create/update requests accept at most **250 entities per request**;
-amoCRM recommends ≤50 for reliability. On a 504, reduce the batch size and
-retry.
+amoCRM recommends ≤50 for reliability. On a 504, check whether the write
+was applied before resending a smaller batch; a timeout does not prove failure.
 
-## Idempotency for creation
+## Matching creation responses
 
 When creating multiple entities in a single POST, you can include
 `request_id` in each item. amoCRM echoes it back in the response — useful for
 matching response items to your input order, especially when some fail.
+`request_id` is a correlation value, not an idempotency key: replaying a POST
+can create duplicates. Reconcile the result after a timeout or 5xx first.
 
 ```json
 [
@@ -207,3 +210,21 @@ POST in the API (for example, webhook subscription takes an object):
 
 PATCH on a single entity by ID (`PATCH /leads/{id}`) takes an object. Bulk
 PATCH (`PATCH /leads`) takes an array.
+
+## Official sources
+
+Checked on 2026-10-03. Use the method documentation for account-specific
+permissions, supported filters, and batch limits.
+
+- [API reference](https://www.amocrm.ru/developers/content/crm_platform/api-reference)
+- [Auth and long-lived tokens](https://www.amocrm.ru/developers/content/oauth/step-by-step)
+- [Limits](https://www.amocrm.ru/developers/content/api/recommendations)
+- [Alpha filtering](https://www.amocrm.ru/developers/content/crm_platform/filters-api)
+- [Account and task types](https://www.amocrm.ru/developers/content/crm_platform/account-info)
+- [Leads and complex creation](https://www.amocrm.ru/developers/content/crm_platform/leads-api)
+- [Contacts](https://www.amocrm.ru/developers/content/crm_platform/contacts-api)
+- [Companies](https://www.amocrm.ru/developers/content/crm_platform/companies-api)
+- [Pipelines and statuses](https://www.amocrm.ru/developers/content/crm_platform/leads_pipelines)
+- [Tasks](https://www.amocrm.ru/developers/content/crm_platform/tasks-api)
+- [Notes](https://www.amocrm.ru/developers/content/crm_platform/events-and-notes)
+- [Webhooks](https://www.amocrm.ru/developers/content/crm_platform/webhooks-api)

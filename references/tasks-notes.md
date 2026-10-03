@@ -47,8 +47,8 @@ account-specific types via `GET /api/v4/account?with=task_types`; never assume I
 
 ### Create a task
 
-`complete_till` is a Unix timestamp (seconds). amoCRM rounds it to the nearest
-30-minute slot for built-in types, except `task_type_id: 4+` (custom).
+`complete_till` is a Unix timestamp in seconds. Resolve the user's timezone
+before calculating it; the REST documentation does not promise rounding.
 
 ```bash
 python scripts/api_call.py --method POST --url "/api/v4/tasks" --body '[
@@ -109,7 +109,9 @@ others (calls, attachments) carry structured `params`.
 |---|---|
 | `GET` | `/api/v4/{entity}/{id}/notes` |
 | `GET` | `/api/v4/{entity}/notes` (across all entities of a type) |
-| `POST` | `/api/v4/{entity}/{id}/notes` |
+| `POST` | `/api/v4/{entity}/{id}/notes` (array) |
+| `POST` | `/api/v4/{entity}/notes` (array; each item needs `entity_id`) |
+| `PATCH` | `/api/v4/{entity}/notes` or `/api/v4/{entity}/{id}/notes` (array; each item needs note `id`) |
 | `PATCH` | `/api/v4/{entity}/{id}/notes/{note_id}` |
 
 The v4 notes API documents listing, creation, and PATCH editing. It does not
@@ -124,7 +126,7 @@ document a DELETE method for notes; do not invent one.
 | `common` | Free text | `{"text": "..."}` |
 | `call_in` | Inbound call log | `{"phone": "...", "duration": 120, "source": "asterisk"}` |
 | `call_out` | Outbound call log | same as above |
-| `service_message` | System log | `{"text": "..."}` |
+| `service_message` | System log | `{"text": "...", "service": "..."}` |
 | `extended_service_message` | System with formatting | `{"text": "...", "service": "..."}` |
 | `attachment` | File link | `{"file_uuid": "...", "version_uuid": "...", "file_name": "..."}` |
 | `geolocation` | Coordinates | `{"address": "...", "latitude": ..., "longitude": ...}` |
@@ -148,12 +150,18 @@ python scripts/api_call.py --method POST --url "/api/v4/contacts/7777/notes" --b
     "note_type": "call_in",
     "params": {
       "phone": "+79991234567",
+      "uniq": "8f52d38a-5fb3-406d-93a3-a4832dc28f8b",
       "duration": 180,
-      "source": "manual"
+      "source": "manual",
+      "link": "https://example.com/call-recording"
     }
   }
 ]'
 ```
+
+Use a fresh `uniq` for each distinct call and a real recording URL in `link`.
+For calls to appear in user analytics, the official example sets equal
+`created_by` and `responsible_user_id`.
 
 ### List notes for an entity
 

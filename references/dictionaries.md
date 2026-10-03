@@ -25,8 +25,8 @@ Pipeline object:
   "_embedded": {
     "statuses": [
       {"id": 12001, "name": "New",  "color": "#fffeb2", "type": 0},
-      {"id": 142,   "name": "Won",  "color": "#CCFF66", "type": 1},
-      {"id": 143,   "name": "Lost", "color": "#D5D8DB", "type": 2}
+      {"id": 142,   "name": "Won",  "color": "#CCFF66", "type": 0},
+      {"id": 143,   "name": "Lost", "color": "#D5D8DB", "type": 0}
     ]
   }
 }
@@ -37,7 +37,7 @@ System statuses are present in every pipeline:
 | `status_id` | Meaning |
 |---|---|
 | 142 | Successful (won) |
-| 143 | Closed and unsuccessful (lost) — requires `loss_reason_id` |
+| 143 | Closed and unsuccessful (lost); `loss_reason_id` is optional |
 
 Won/lost are determined by the **fixed `status_id` 142 / 143**, not by the
 `type` field. The `type` field marks special inbox states: `1` = "Неразобранное"
@@ -118,8 +118,9 @@ System multitext fields use `field_code` instead of `field_id`:
 | `POSITION` | contacts |
 | `WEB` | companies |
 
-`enum_code` for PHONE/EMAIL: `WORK`, `MOB`, `WORKDD`, `WORKFAX`, `FAX`,
-`HOME`, `OTHER`, `WORKPHONE`.
+Use the target field's returned `enums` to choose a code or ID. For example,
+`WORK` is common for PHONE/EMAIL and `MOB` for PHONE; do not assume all codes
+exist on both fields.
 
 ## Tags
 
@@ -144,8 +145,15 @@ python scripts/api_call.py --method PATCH --url "/api/v4/leads/12345" --body '{
 }'
 ```
 
-To remove all tags, send `{"_embedded": {"tags": []}}`. Sending a partial list
-replaces the whole set — there's no "add one tag" semantics.
+To clear tags, the documented lead PATCH example uses
+`{"_embedded": {"tags": null}}`. For lead tag changes that preserve the other
+tags, use `tags_to_add` and `tags_to_delete`:
+
+```json
+{"tags_to_add": [{"id": 1}], "tags_to_delete": [{"id": 2}]}
+```
+
+Verify the target entity's PATCH documentation before reusing these fields.
 
 Same pattern for contacts and companies (`/contacts/tags`, `/companies/tags`).
 

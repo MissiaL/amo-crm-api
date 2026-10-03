@@ -43,6 +43,11 @@ def build_url(url_arg: str, subdomain: str, allow_test_url: bool = False) -> str
 MAX_ERROR_BODY = 4096
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(req.full_url, code, "Redirect rejected", headers, fp)
+
+
 def _classify_error(status: int, body: str, headers, secrets=()) -> str:
     """Build a 1-2 line stderr message for an HTTP error, with a recovery hint and the server body."""
     for secret in secrets:
@@ -74,7 +79,8 @@ def _classify_error(status: int, body: str, headers, secrets=()) -> str:
         )
     if 500 <= status < 600:
         return (
-            f"error: HTTP {status} — server-side failure on amoCRM. Retry later.\n"
+            f"error: HTTP {status} — server-side failure on amoCRM. "
+            "Retry reads later; verify the outcome of writes before resending.\n"
             f"server response: {body}"
         )
     if status == 400:
@@ -112,10 +118,6 @@ def main() -> int:
         print(f"error: {e}", file=sys.stderr)
         return 1
 
-    if args.dry_run:
-        print(url)
-        return 0
-
     # Build query string with doseq=True so arrays/filter[..]= keys serialize right
     query = ""
     if args.params:
@@ -128,7 +130,10 @@ def main() -> int:
             print("error: --params must be a JSON object", file=sys.stderr)
             return 1
         query = urllib.parse.urlencode(params, doseq=True)
-    full_url = url + ("?" + query if query else "")
+    parsed = urllib.parse.urlsplit(url)
+    full_url = urllib.parse.urlunsplit(parsed._replace(
+        query="&".join(part for part in (parsed.query, query) if part),
+    ))
 
     headers: dict = {}
     body_bytes = None
@@ -154,9 +159,13 @@ def main() -> int:
     # Authorization is non-overridable — always Bearer-from-env
     headers["Authorization"] = f"Bearer {token}"
 
+    if args.dry_run:
+        print(full_url)
+        return 0
+
     req = urllib.request.Request(full_url, data=body_bytes, headers=headers, method=args.method)
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.build_opener(NoRedirect()).open(req, timeout=30) as resp:
             data = resp.read()
             if data:
                 sys.stdout.write(data.decode("utf-8"))
@@ -167,8 +176,10 @@ def main() -> int:
         msg = _classify_error(e.code, body, e.headers, secrets=(token,))
         print(msg, file=sys.stderr)
         return 1
-    except urllib.error.URLError as e:
-        print(f"error: network failure: {e.reason}", file=sys.stderr)
+    except (urllib.error.URLError, TimeoutError) as e:
+        reason = e.reason if isinstance(e, urllib.error.URLError) else str(e)
+        hint = "" if args.method == "GET" else " Write outcome is unknown; verify it before resending."
+        print(f"error: network failure: {reason}.{hint}", file=sys.stderr)
         return 1
 
 

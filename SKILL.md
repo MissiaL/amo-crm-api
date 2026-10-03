@@ -1,14 +1,17 @@
 ---
 name: amo-crm-api
 description: "Work with amoCRM (amo CRM, амоСРМ) REST API v4: сделки, контакты, компании, задачи, примечания, справочники и webhook-подписки. Use for amoCRM API requests and account data operations on *.amocrm.ru; not for generic CRM advice."
-metadata: {"author":"MissiaL","version":"0.2.0","keywords":["amocrm","crm","sales","leads","contacts","tasks"]}
+metadata: {"author":"MissiaL","version":"0.2.1","keywords":["amocrm","crm","sales","leads","contacts","tasks"]}
 ---
 
 # amo-crm-api
 
-Full CRUD over amoCRM REST API v4 — leads, contacts, companies, tasks, notes,
-plus dictionary lookups (pipelines, users, custom fields, tags) and webhook
-subscription management.
+Read, create, and update leads, contacts, companies, tasks, and notes through
+amoCRM REST API v4, plus dictionary lookups and webhook subscription management.
+The documented v4 APIs for these core entities do not expose DELETE.
+
+Official API documentation checked on 2026-10-03; source links are in
+[references/conventions.md](references/conventions.md).
 
 ## Setup
 
@@ -51,6 +54,9 @@ python scripts/api_call.py --method PATCH --url "/api/v4/leads/12345" \
 python scripts/api_call.py --method PATCH --url "/api/v4/leads" \
   --body '[{"id":12345,"status_id":42},{"id":12346,"status_id":143}]'
 ```
+
+Existing URL query parameters are preserved when adding `--params`. Redirects
+are rejected so the account token stays on the original host.
 
 `--params`, `--body`, and `--headers` MUST be valid JSON. Don't pass query
 strings like `a=1&b=2`. Don't pass form-encoded bodies.
@@ -126,4 +132,4 @@ Load only what you need for the current request:
   relying on alpha filters. Top-level `query` is still documented but marked
   for future deprecation; prefer stable IDs whenever possible.
 - **Never expose `AMOCRM_TOKEN`** to the user, in logs, or in messages. The
-  script already redacts it from output.
+  script redacts it from HTTP error bodies; keep request and response data private.

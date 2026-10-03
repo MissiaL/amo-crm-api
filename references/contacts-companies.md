@@ -20,8 +20,9 @@ Read [conventions.md](conventions.md) first.
 
 This is the #1 trap with amoCRM. There is no `phone` or `email` property on a
 contact. Both live inside `custom_fields_values` with `field_code: "PHONE"`
-and `field_code: "EMAIL"`. They have built-in `enum_code` values: `WORK`,
-`MOB`, `WORKDD`, `WORKFAX`, `FAX`, `HOME`, `OTHER`, `WORKPHONE`.
+and `field_code: "EMAIL"`. Read each field's `enums` from the account custom-field
+dictionary; PHONE and EMAIL do not necessarily share the same codes.
+Common examples are `WORK` (both) and `MOB` (phone).
 
 Set them on creation:
 
@@ -51,10 +52,11 @@ python scripts/api_call.py --method GET --url "/api/v4/contacts" \
 deprecation. Normalize and compare the returned PHONE/EMAIL values before
 deciding that a contact is a duplicate.
 
-If API filtering is enabled, an exact custom-field filter uses the numeric
-field ID as the key, for example
-`filter[custom_fields_values][12345][]=+79991234567`. Do not use the indexed
-`field_code`/`values` shape from write payloads as query parameters.
+The Alpha filtering reference does not list `multitext` (PHONE/EMAIL) among
+supported custom-field types. Use `query` and compare returned values for
+phones/emails. For supported custom fields, use the numeric ID in the query
+key, e.g. `filter[custom_fields_values][12345][]=Webform`; the nested write
+payload shape is not a query filter.
 
 ## Contact object shape
 
@@ -136,8 +138,9 @@ For linking contacts to LEADS — see [leads.md](leads.md).
 
 ## Detecting duplicates
 
-amoCRM has a built-in dedupe check, but it's UI-side. Programmatically, search
-by phone or email before creating:
+`POST /api/v4/leads/complex` supports integration duplicate control when
+enabled, but ordinary contact creation is not a deduplication operation.
+Search by phone or email before creating:
 
 ```bash
 # Search by normalized phone first

@@ -90,7 +90,8 @@ python scripts/api_call.py --method POST --url "/api/v4/leads" --body '[
 ## Create with linked contact + company in ONE call (`/leads/complex`)
 
 This is the cleanest way to onboard a new prospect. amoCRM creates the lead,
-contact, and company atomically and returns all three IDs.
+contact, and company together and returns their IDs. If integration duplicate
+control is enabled, it may update existing entities instead; inspect `merged`.
 
 ```bash
 python scripts/api_call.py --method POST --url "/api/v4/leads/complex" --body '[
@@ -118,7 +119,10 @@ python scripts/api_call.py --method POST --url "/api/v4/leads/complex" --body '[
 The endpoint accepts at most 50 leads per request, at most one embedded contact
 and one embedded company per lead, and at most 40 custom-field values per
 created entity. The response is an array of objects with `id` (lead),
-`contact_id`, `company_id`, and `request_id` (echo of what you sent).
+`contact_id`, `company_id`, `merged`, and `request_id` (an array of correlation
+strings, possibly several when duplicates are merged). Duplicate control
+compares against existing account data, not duplicates within the submitted
+batch. It does not make a repeated POST idempotent.
 
 ## Update a single lead
 
